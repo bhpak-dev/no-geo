@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Notion Static Map Widget (Use strictly restricted and monitored)</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: transparent;
+      color: #37352f;
+      padding: 16px;
+      margin: 0;
+      box-sizing: border-box;
+    }
+    .widget-card {
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 16px;
+      background: #ffffff;
+      max-width: 480px;
+    }
+    .form-group {
+      margin-bottom: 12px;
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: #555;
+    }
+    input, select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #d0d0d0;
+      border-radius: 6px;
+      font-size: 13px;
+      box-sizing: border-box;
+    }
+    .radio-group {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+    .radio-group label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      color: #37352f;
+    }
+    .radio-group input {
+      width: auto;
+      margin: 0;
+    }
+    .row {
+      display: flex;
+      gap: 10px;
+    }
+    .col {
+      flex: 1;
+    }
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    button {
+      flex: 1;
+      padding: 9px 12px;
+      background: #007399;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    button:hover { background: #005a78; }
+    #preview-container {
+      margin-top: 14px;
+      text-align: center;
+    }
+    #preview-img {
+      max-width: 100%;
+      border-radius: 6px;
+      display: none;
+      border: 1px solid #ddd;
+    }
+    #status {
+      font-size: 12px;
+      color: #666;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="widget-card">
+    <!-- Input Mode Selection -->
+    <div class="radio-group">
+      <label>
+        <input type="radio" name="inputMode" value="address" checked onchange="toggleInputMode()">
+        Street Address
+      </label>
+      <label>
+        <input type="radio" name="inputMode" value="coordinates" onchange="toggleInputMode()">
+        Latitude & Longitude
+      </label>
+    </div>
+
+    <!-- Address Input Container -->
+    <div id="addressContainer" class="form-group">
+      <label for="addressInput">Street Address or Place</label>
+      <input type="text" id="addressInput" placeholder="e.g. 100 Main St, Anchorage, AK" />
+    </div>
+
+    <!-- Coordinates Input Container (Hidden by default) -->
+    <div id="coordinatesContainer" class="form-group" style="display: none;">
+      <div class="row">
+        <div class="col">
+          <label for="latInput">Latitude</label>
+          <input type="number" step="any" id="latInput" placeholder="e.g. 61.2181" />
+        </div>
+        <div class="col">
+          <label for="lonInput">Longitude</label>
+          <input type="number" step="any" id="lonInput" placeholder="e.g. -149.9003" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Dimensions: Width & Height -->
+    <div class="row form-group">
+      <div class="col">
+        <label for="widthInput">Width (px)</label>
+        <input type="number" id="widthInput" value="500" min="100" max="1000" />
+      </div>
+      <div class="col">
+        <label for="heightInput">Height (px)</label>
+        <input type="number" id="heightInput" value="500" min="100" max="1000" />
+      </div>
+    </div>
+
+    <!-- Controls: Zoom & Marker Size -->
+    <div class="row form-group">
+      <div class="col">
+        <label for="zoomSelect">Zoom Level</label>
+        <select id="zoomSelect">
+          <option value="10">10 (City area)</option>
+          <option value="11">11</option>
+          <option value="12">12</option>
+          <option value="13">13</option>
+          <option value="14">14</option>
+          <option value="15" selected>15 (Neighborhood)</option>
+          <option value="16">16</option>
+          <option value="17">17</option>
+          <option value="18">18</option>
+          <option value="19">19</option>
+          <option value="20">20 (Building level)</option>
+        </select>
+      </div>
+      <div class="col">
+        <label for="markerSizeSelect">Marker Size</label>
+        <select id="markerSizeSelect">
+          <option value="20">20 px</option>
+          <option value="25" selected>25 px</option>
+          <option value="30">30 px</option>
+          <option value="35">35 px</option>
+          <option value="40">40 px</option>
+          <option value="45">45 px</option>
+          <option value="50">50 px</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="btn-row">
+      <button onclick="generateAndDownload()">Generate & Download</button>
+      <button onclick="copyImageToClipboard()" style="background:#46505a;">Copy to Clipboard</button>
+    </div>
+    
+    <div id="status"></div>
+    <div id="preview-container">
+      <img id="preview-img" alt="Generated Map Preview" />
+    </div>
+  </div>
+
+  <script>
+    const API_KEY = "934c009162214ab1ade7dece1f2a9b60";
+
+    function toggleInputMode() {
+      const mode = document.querySelector('input[name="inputMode"]:checked').value;
+      const addrContainer = document.getElementById("addressContainer");
+      const coordContainer = document.getElementById("coordinatesContainer");
+
+      if (mode === "address") {
+        addrContainer.style.display = "block";
+        coordContainer.style.display = "none";
+      } else {
+        addrContainer.style.display = "none";
+        coordContainer.style.display = "block";
+      }
+    }
+
+    async function resolveCoordinates() {
+      const mode = document.querySelector('input[name="inputMode"]:checked').value;
+
+      if (mode === "coordinates") {
+        const lat = parseFloat(document.getElementById("latInput").value);
+        const lon = parseFloat(document.getElementById("lonInput").value);
+
+        if (isNaN(lat) || isNaN(lon)) {
+          throw new Error("Please enter valid decimal coordinates for Latitude and Longitude.");
+        }
+        return { lon, lat, label: `${lat.toFixed(4)}_${lon.toFixed(4)}` };
+      } else {
+        const address = document.getElementById("addressInput").value.trim();
+        if (!address) {
+          throw new Error("Please enter a street address.");
+        }
+
+        const geoUrl = `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(address)}&apiKey=${API_KEY}`;
+        const geoRes = await fetch(geoUrl);
+        const geoData = await geoRes.json();
+
+        if (!geoData.features || geoData.features.length === 0) {
+          throw new Error("Address not found. Please verify spelling or use coordinates.");
+        }
+
+        const [lon, lat] = geoData.features[0].geometry.coordinates;
+        return { lon, lat, label: address.replace(/[^a-zA-Z0-9]/g, "_") };
+      }
+    }
+
+    async function buildMapUrl() {
+      const { lon, lat, label } = await resolveCoordinates();
+      const width = document.getElementById("widthInput").value || 500;
+      const height = document.getElementById("heightInput").value || 500;
+      const zoom = document.getElementById("zoomSelect").value;
+      const markerSize = document.getElementById("markerSizeSelect").value;
+
+      const styleCustom = "landcover_grass:%230a3c32|landcover_wood:%235b280e|water:%2362828c|waterway:%2362828c|rail:%2346505a;6|rail_hatch:%2346505a;10|road_path:%23a0cac1|water_name_lakeline:%23ffffff|water_name_way:%23ffffff|water_name_sea:%23ffffff|water_name_ocean:%23ffffff|road_label_primary:%2346505a|road_label_secondary:%2346505a|place_label_park:%2346505a|place_label_village:%2346505a|place_label_city:%2346505a|place_label_town:%2346505a|place_label_state:%2346505a|place_label_country:%2346505a|place_label_continent:%2346505a";
+
+      const mapUrl = `https://maps.geoapify.com/v1/staticmap?style=toner-grey&width=${width}&height=${height}&center=lonlat:${lon},${lat}&zoom=${zoom}&styleCustomization=${encodeURIComponent(styleCustom)}&marker=lonlat:${lon},${lat};type:awesome;color:%23007399;size:${markerSize}&scaleFactor=2&apiKey=${API_KEY}`;
+
+      return { mapUrl, label };
+    }
+
+    async function generateAndDownload() {
+      const status = document.getElementById("status");
+      const img = document.getElementById("preview-img");
+
+      status.innerText = "Resolving location and generating map...";
+      status.style.color = "#666";
+
+      try {
+        const { mapUrl, label } = await buildMapUrl();
+        img.src = mapUrl;
+        img.style.display = "block";
+
+        const res = await fetch(mapUrl);
+        const blob = await res.blob();
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `map-${label}.png`;
+        a.click();
+
+        status.innerText = "Map downloaded successfully!";
+        status.style.color = "#0a7a3b";
+      } catch (err) {
+        status.innerText = "Error: " + err.message;
+        status.style.color = "#c0392b";
+      }
+    }
+
+    async function copyImageToClipboard() {
+      const status = document.getElementById("status");
+      const img = document.getElementById("preview-img");
+
+      status.innerText = "Resolving location and rendering map for clipboard...";
+      status.style.color = "#666";
+
+      try {
+        const { mapUrl } = await buildMapUrl();
+        img.src = mapUrl;
+        img.style.display = "block";
+
+        const res = await fetch(mapUrl);
+        const blob = await res.blob();
+        await navigator.clipboard.write([
+          new ClipboardItem({ [blob.type]: blob })
+        ]);
+        status.innerText = "Map copied! Paste (Ctrl+V / Cmd+V) directly into Notion.";
+        status.style.color = "#0a7a3b";
+      } catch (err) {
+        status.innerText = "Clipboard write failed: " + err.message;
+        status.style.color = "#c0392b";
+      }
+    }
+  </script>
+</body>
+</html>
