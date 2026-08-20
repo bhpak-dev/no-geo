@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Notion Static Map Widget (Use strictly restricted and monitored)</title>
+  <title>Notion Static Map Widget</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
@@ -99,6 +99,12 @@
 <body>
 
   <div class="widget-card">
+    <!-- Password / API Key Input -->
+    <div class="form-group">
+      <label for="apiKeyInput">Password</label>
+      <input type="password" id="apiKeyInput" placeholder="Enter password..." />
+    </div>
+
     <!-- Input Mode Selection -->
     <div class="radio-group">
       <label>
@@ -188,7 +194,23 @@
   </div>
 
   <script>
-    const API_KEY = "934c009162214ab1ade7dece1f2a9b60";
+    // Load stored key on page initialization if previously saved
+    document.addEventListener("DOMContentLoaded", () => {
+      const savedKey = localStorage.getItem("notion_map_widget_key");
+      if (savedKey) {
+        document.getElementById("apiKeyInput").value = savedKey;
+      }
+    });
+
+    function getApiKey() {
+      const keyInput = document.getElementById("apiKeyInput").value.trim();
+      if (!keyInput) {
+        throw new Error("Please enter the Password.");
+      }
+      // Save locally in the browser so it persists across refreshes
+      localStorage.setItem("notion_map_widget_key", keyInput);
+      return keyInput;
+    }
 
     function toggleInputMode() {
       const mode = document.querySelector('input[name="inputMode"]:checked').value;
@@ -204,7 +226,7 @@
       }
     }
 
-    async function resolveCoordinates() {
+    async function resolveCoordinates(apiKey) {
       const mode = document.querySelector('input[name="inputMode"]:checked').value;
 
       if (mode === "coordinates") {
@@ -221,7 +243,7 @@
           throw new Error("Please enter a street address.");
         }
 
-        const geoUrl = `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(address)}&apiKey=${API_KEY}`;
+        const geoUrl = `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(address)}&apiKey=${apiKey}`;
         const geoRes = await fetch(geoUrl);
         const geoData = await geoRes.json();
 
@@ -235,7 +257,8 @@
     }
 
     async function buildMapUrl() {
-      const { lon, lat, label } = await resolveCoordinates();
+      const apiKey = getApiKey();
+      const { lon, lat, label } = await resolveCoordinates(apiKey);
       const width = document.getElementById("widthInput").value || 500;
       const height = document.getElementById("heightInput").value || 500;
       const zoom = document.getElementById("zoomSelect").value;
@@ -243,7 +266,7 @@
 
       const styleCustom = "landcover_grass:%230a3c32|landcover_wood:%235b280e|water:%2362828c|waterway:%2362828c|rail:%2346505a;6|rail_hatch:%2346505a;10|road_path:%23a0cac1|water_name_lakeline:%23ffffff|water_name_way:%23ffffff|water_name_sea:%23ffffff|water_name_ocean:%23ffffff|road_label_primary:%2346505a|road_label_secondary:%2346505a|place_label_park:%2346505a|place_label_village:%2346505a|place_label_city:%2346505a|place_label_town:%2346505a|place_label_state:%2346505a|place_label_country:%2346505a|place_label_continent:%2346505a";
 
-      const mapUrl = `https://maps.geoapify.com/v1/staticmap?style=toner-grey&width=${width}&height=${height}&center=lonlat:${lon},${lat}&zoom=${zoom}&styleCustomization=${encodeURIComponent(styleCustom)}&marker=lonlat:${lon},${lat};type:awesome;color:%23007399;size:${markerSize}&scaleFactor=2&apiKey=${API_KEY}`;
+      const mapUrl = `https://maps.geoapify.com/v1/staticmap?style=toner-grey&width=${width}&height=${height}&center=lonlat:${lon},${lat}&zoom=${zoom}&styleCustomization=${encodeURIComponent(styleCustom)}&marker=lonlat:${lon},${lat};type:awesome;color:%23007399;size:${markerSize}&scaleFactor=2&apiKey=${apiKey}`;
 
       return { mapUrl, label };
     }
