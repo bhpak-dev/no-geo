@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Notion Static Map Widget</title>
+  <title>Notion Static Map Generator</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -20,18 +20,35 @@
       background: #ffffff;
       max-width: 480px;
     }
-    input {
+    .form-group {
+      margin-bottom: 10px;
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: #555;
+    }
+    input[type="text"], select {
       width: 100%;
       padding: 8px 10px;
       border: 1px solid #d0d0d0;
       border-radius: 6px;
-      font-size: 14px;
+      font-size: 13px;
       box-sizing: border-box;
-      margin-bottom: 10px;
+    }
+    .form-row {
+      display: flex;
+      gap: 10px;
+    }
+    .form-row .form-group {
+      flex: 1;
     }
     .btn-row {
       display: flex;
       gap: 8px;
+      margin-top: 12px;
     }
     button {
       flex: 1;
@@ -49,6 +66,7 @@
       font-size: 12px;
       color: #666;
       margin-top: 8px;
+      min-height: 16px;
     }
     #preview-container {
       margin-top: 12px;
@@ -72,14 +90,52 @@
 <body>
 
   <div class="widget-card">
-    <input type="text" id="addressInput" placeholder="Enter street address or city..." />
+    <div class="form-group">
+      <label for="addressInput">Street Address or Location</label>
+      <input type="text" id="addressInput" placeholder="E.g., 1600 Amphitheatre Pkwy, Mountain View, CA" />
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="zoomSelect">Zoom Level</label>
+        <select id="zoomSelect">
+          <option value="12">12 — City Area</option>
+          <option value="14">14 — Neighborhood</option>
+          <option value="15" selected>15 — Street / District</option>
+          <option value="16">16 — Close-up Street</option>
+          <option value="17">17 — Exact Block</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="styleSelect">Base Style</label>
+        <select id="styleSelect">
+          <option value="toner-grey" selected>Toner Grey (Custom Geo)</option>
+          <option value="osm-bright">OSM Bright</option>
+          <option value="positron">Positron Light</option>
+          <option value="dark-matter">Dark Matter</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="markerColor">Marker</label>
+        <select id="markerColor">
+          <option value="%23007399" selected>Teal Blue</option>
+          <option value="%23d9534f">Red</option>
+          <option value="%232e7d32">Green</option>
+          <option value="%2346505a">Slate</option>
+        </select>
+      </div>
+    </div>
+
     <div class="btn-row">
       <button onclick="generateMap()">Generate & Download Map</button>
     </div>
+    
     <div id="status"></div>
     <div id="preview-container">
-      <img id="preview-img" alt="Generated Map" />
-      <div id="hint" class="hint">Right-click (or drag) the image directly into your Notion page.</div>
+      <img id="preview-img" alt="Generated Map Preview" />
+      <div id="hint" class="hint">Right-click image $\rightarrow$ <em>Copy Image</em>, or drag it into Notion.</div>
     </div>
   </div>
 
@@ -88,6 +144,10 @@
 
     async function generateMap() {
       const address = document.getElementById("addressInput").value.trim();
+      const zoom = document.getElementById("zoomSelect").value;
+      const baseStyle = document.getElementById("styleSelect").value;
+      const markerColor = document.getElementById("markerColor").value;
+
       const status = document.getElementById("status");
       const img = document.getElementById("preview-img");
       const hint = document.getElementById("hint");
@@ -97,38 +157,48 @@
         return;
       }
 
-      status.innerText = "Locating address & rendering map...";
+      status.innerText = "Locating address & generating map...";
       img.style.display = "none";
       hint.style.display = "none";
 
       try {
-        // 1. Geocode address
+        // 1. Geocode the address
         const geoUrl = `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(address)}&apiKey=${API_KEY}`;
         const geoRes = await fetch(geoUrl);
         const geoData = await geoRes.json();
 
         if (!geoData.features || geoData.features.length === 0) {
-          throw new Error("Address not found. Please refine search.");
+          throw new Error("Address not found. Please refine the text.");
         }
 
         const [lon, lat] = geoData.features[0].geometry.coordinates;
 
-        // 2. Build properly URL-encoded static map query
+        // 2. Define style customizations
         const styleRules = "landcover_grass:%230a3c32|landcover_wood:%235b280e|water:%2362828c|waterway:%2362828c|rail:%2346505a;6|rail_hatch:%2346505a;10|road_path:%23a0cac1|water_name_lakeline:%23ffffff|water_name_way:%23ffffff|water_name_sea:%23ffffff|water_name_ocean:%23ffffff|road_label_primary:%2346505a|road_label_secondary:%2346505a|place_label_park:%2346505a|place_label_village:%2346505a|place_label_city:%2346505a|place_label_town:%2346505a|place_label_state:%2346505a|place_label_country:%2346505a|place_label_continent:%2346505a";
-        const mapUrl = `https://maps.geoapify.com/v1/staticmap?style=toner-grey&width=500&height=500&center=lonlat:${lon},${lat}&zoom=15&styleCustomization=${encodeURIComponent(styleRules)}&marker=lonlat:${lon},${lat};type:awesome;color:%23007399;size:24&scaleFactor=2&apiKey=${API_KEY}`;
 
-        // 3. Fetch image as Blob and convert to object URL for reliable iframe preview
+        let mapUrl = `https://maps.geoapify.com/v1/staticmap?style=${baseStyle}&width=500&height=500&center=lonlat:${lon},${lat}&zoom=${zoom}&marker=lonlat:${lon},${lat};type:awesome;color:${markerColor};size:24&scaleFactor=2&apiKey=${API_KEY}`;
+
+        if (baseStyle === "toner-grey") {
+          mapUrl += `&styleCustomization=${styleRules}`;
+        }
+
+        // 3. Fetch image as blob
         const imgRes = await fetch(mapUrl);
-        if (!imgRes.ok) throw new Error("Failed to render map image from server.");
+        if (!imgRes.ok) {
+          throw new Error(`Server returned HTTP ${imgRes.status} while generating map.`);
+        }
+        
         const blob = await imgRes.blob();
         const objectUrl = URL.createObjectURL(blob);
 
+        // 4. Display preview in iframe
         img.src = objectUrl;
         img.style.display = "inline-block";
         hint.style.display = "block";
 
-        // 4. Force browser file download to ~/Downloads
-        const filename = `map-${address.replace(/[^a-zA-Z0-9]/g, "_")}.png`;
+        // 5. Trigger download to default downloads folder
+        const safeName = address.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 30);
+        const filename = `map-${safeName}.png`;
         const a = document.createElement("a");
         a.href = objectUrl;
         a.download = filename;
