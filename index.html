@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Notion Static Map Generator</title>
+  <title>Notion Map Generator</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background: transparent;
       color: #37352f;
-      padding: 12px;
+      padding: 10px;
       margin: 0;
       box-sizing: border-box;
     }
@@ -18,29 +18,61 @@
       border-radius: 8px;
       padding: 14px;
       background: #ffffff;
-      max-width: 480px;
+      max-width: 520px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
     .form-group {
       margin-bottom: 10px;
+      position: relative;
     }
     label {
       display: block;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
       margin-bottom: 4px;
       color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
-    input[type="text"], select {
+    input[type="text"], input[type="password"], input[type="number"], select {
       width: 100%;
-      padding: 8px 10px;
+      padding: 7px 9px;
       border: 1px solid #d0d0d0;
       border-radius: 6px;
       font-size: 13px;
       box-sizing: border-box;
+      background: #fff;
     }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #007399;
+    }
+    .autocomplete-items {
+      position: absolute;
+      border: 1px solid #d4d4d4;
+      border-top: none;
+      z-index: 999;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background-color: #fff;
+      border-radius: 0 0 6px 6px;
+      max-height: 180px;
+      overflow-y: auto;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .autocomplete-item {
+      padding: 8px 10px;
+      cursor: pointer;
+      font-size: 12px;
+      border-bottom: 1px solid #f0f0f0;
+      line-height: 1.3;
+    }
+    .autocomplete-item:hover { background-color: #e9f4f8; }
+    .autocomplete-item strong { color: #007399; }
     .form-row {
       display: flex;
-      gap: 10px;
+      gap: 8px;
     }
     .form-row .form-group {
       flex: 1;
@@ -60,6 +92,7 @@
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
+      transition: background 0.15s ease;
     }
     button:hover { background: #005a78; }
     #status {
@@ -91,22 +124,60 @@
 
   <div class="widget-card">
     <div class="form-group">
-      <label for="addressInput">Street Address or Location</label>
-      <input type="text" id="addressInput" placeholder="E.g., 1600 Amphitheatre Pkwy, Mountain View, CA" />
+      <label for="apiKey">Geoapify API Key</label>
+      <input type="password" id="apiKey" placeholder="Paste your API key here..." autocomplete="off" />
+    </div>
+
+    <div class="form-group">
+      <label for="addressInput">Search Location / Business Name</label>
+      <input type="text" id="addressInput" placeholder="Start typing an address or POI..." autocomplete="off" />
+      <div id="autocomplete-list" class="autocomplete-items"></div>
     </div>
 
     <div class="form-row">
       <div class="form-group">
-        <label for="zoomSelect">Zoom Level</label>
+        <label for="latInput">Latitude (Optional)</label>
+        <input type="text" id="latInput" placeholder="e.g. 61.2181" />
+      </div>
+      <div class="form-group">
+        <label for="lonInput">Longitude (Optional)</label>
+        <input type="text" id="lonInput" placeholder="e.g. -149.9003" />
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="zoomSelect">Zoom</label>
         <select id="zoomSelect">
-          <option value="12">12 — City Area</option>
-          <option value="14">14 — Neighborhood</option>
-          <option value="15" selected>15 — Street / District</option>
-          <option value="16">16 — Close-up Street</option>
-          <option value="17">17 — Exact Block</option>
+          <option value="12">12 — City</option>
+          <option value="14">14 — Area</option>
+          <option value="15" selected>15 — Street</option>
+          <option value="16">16 — Close-up</option>
+          <option value="17">17 — Block</option>
         </select>
       </div>
 
+      <div class="form-group">
+        <label for="scaleFactor">Scale / Retina</label>
+        <select id="scaleFactor">
+          <option value="1">1x Standard</option>
+          <option value="2" selected>2x High-DPI</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="markerColor">Marker Color</label>
+        <select id="markerColor">
+          <option value="%23007399" selected>Teal Blue</option>
+          <option value="%23d9534f">Red</option>
+          <option value="%232e7d32">Green</option>
+          <option value="%2346505a">Slate</option>
+          <option value="%23f0ad4e">Amber</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row">
       <div class="form-group">
         <label for="styleSelect">Base Style</label>
         <select id="styleSelect">
@@ -114,17 +185,18 @@
           <option value="osm-bright">OSM Bright</option>
           <option value="positron">Positron Light</option>
           <option value="dark-matter">Dark Matter</option>
+          <option value="klokantech-basic">Basic Clean</option>
         </select>
       </div>
 
       <div class="form-group">
-        <label for="markerColor">Marker</label>
-        <select id="markerColor">
-          <option value="%23007399" selected>Teal Blue</option>
-          <option value="%23d9534f">Red</option>
-          <option value="%232e7d32">Green</option>
-          <option value="%2346505a">Slate</option>
-        </select>
+        <label for="mapWidth">Width (px)</label>
+        <input type="number" id="mapWidth" value="500" min="200" max="1200" step="50" />
+      </div>
+
+      <div class="form-group">
+        <label for="mapHeight">Height (px)</label>
+        <input type="number" id="mapHeight" value="500" min="200" max="1200" step="50" />
       </div>
     </div>
 
@@ -135,70 +207,153 @@
     <div id="status"></div>
     <div id="preview-container">
       <img id="preview-img" alt="Generated Map Preview" />
-      <div id="hint" class="hint">Right-click image $\rightarrow$ <em>Copy Image</em>, or drag it into Notion.</div>
+      <div id="hint" class="hint">Right-click image $\rightarrow$ <em>Copy Image</em>, or drag directly into Notion.</div>
     </div>
   </div>
 
   <script>
-    const API_KEY = "934c009162214ab1ade7dece1f2a9b60";
+    const DEFAULT_KEY = "934c009162214ab1ade7dece1f2a9b60";
+    let selectedCoordinates = null;
+    let debounceTimer = null;
+
+    const apiKeyInput = document.getElementById("apiKey");
+    const addressInput = document.getElementById("addressInput");
+    const latInput = document.getElementById("latInput");
+    const lonInput = document.getElementById("lonInput");
+    const dropdown = document.getElementById("autocomplete-list");
+
+    // Load saved API Key or fall back to default
+    const savedKey = localStorage.getItem("geoapify_key");
+    apiKeyInput.value = savedKey || DEFAULT_KEY;
+
+    apiKeyInput.addEventListener("change", () => {
+      localStorage.setItem("geoapify_key", apiKeyInput.value.trim());
+    });
+
+    // Autocomplete handling with debounce
+    addressInput.addEventListener("input", function() {
+      const text = this.value.trim();
+      selectedCoordinates = null;
+      clearTimeout(debounceTimer);
+
+      if (text.length < 3) {
+        dropdown.innerHTML = "";
+        return;
+      }
+
+      const key = apiKeyInput.value.trim() || DEFAULT_KEY;
+
+      debounceTimer = setTimeout(async () => {
+        try {
+          const autoUrl = `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(text)}&apiKey=${key}`;
+          const res = await fetch(autoUrl);
+          const data = await res.json();
+
+          dropdown.innerHTML = "";
+          if (!data.features || data.features.length === 0) return;
+
+          data.features.forEach(feature => {
+            const item = document.createElement("div");
+            item.className = "autocomplete-item";
+            
+            const name = feature.properties.name || "";
+            const formatted = feature.properties.formatted || "";
+            
+            item.innerHTML = name ? `<strong>${name}</strong><br><span style="color:#666">${formatted}</span>` : formatted;
+
+            item.addEventListener("click", function() {
+              addressInput.value = formatted;
+              selectedCoordinates = feature.geometry.coordinates; // [lon, lat]
+              lonInput.value = selectedCoordinates[0].toFixed(6);
+              latInput.value = selectedCoordinates[1].toFixed(6);
+              dropdown.innerHTML = "";
+              document.getElementById("status").innerText = "Selected: " + (name || formatted);
+            });
+
+            dropdown.appendChild(item);
+          });
+        } catch (err) {
+          console.error("Autocomplete error:", err);
+        }
+      }, 300);
+    });
+
+    document.addEventListener("click", function (e) {
+      if (e.target !== addressInput) {
+        dropdown.innerHTML = "";
+      }
+    });
 
     async function generateMap() {
-      const address = document.getElementById("addressInput").value.trim();
+      const key = apiKeyInput.value.trim() || DEFAULT_KEY;
+      const address = addressInput.value.trim();
+      const directLat = parseFloat(latInput.value.trim());
+      const directLon = parseFloat(lonInput.value.trim());
+
       const zoom = document.getElementById("zoomSelect").value;
+      const scale = document.getElementById("scaleFactor").value;
       const baseStyle = document.getElementById("styleSelect").value;
       const markerColor = document.getElementById("markerColor").value;
+      const width = document.getElementById("mapWidth").value || "500";
+      const height = document.getElementById("mapHeight").value || "500";
 
       const status = document.getElementById("status");
       const img = document.getElementById("preview-img");
       const hint = document.getElementById("hint");
 
-      if (!address) {
-        status.innerText = "Please enter an address.";
-        return;
-      }
-
-      status.innerText = "Locating address & generating map...";
+      status.innerText = "Locating position & rendering map...";
       img.style.display = "none";
       hint.style.display = "none";
 
       try {
-        // 1. Geocode the address
-        const geoUrl = `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(address)}&apiKey=${API_KEY}`;
-        const geoRes = await fetch(geoUrl);
-        const geoData = await geoRes.json();
+        let lon, lat;
 
-        if (!geoData.features || geoData.features.length === 0) {
-          throw new Error("Address not found. Please refine the text.");
+        // Coordinate precedence: Direct Lat/Lon fields -> Autocomplete cache -> Geocode Search
+        if (!isNaN(directLat) && !isNaN(directLon)) {
+          lat = directLat;
+          lon = directLon;
+        } else if (selectedCoordinates) {
+          [lon, lat] = selectedCoordinates;
+        } else if (address) {
+          const geoUrl = `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(address)}&apiKey=${key}`;
+          const geoRes = await fetch(geoUrl);
+          const geoData = await geoRes.json();
+
+          if (!geoData.features || geoData.features.length === 0) {
+            throw new Error("Address not found. Please refine search or input coordinates.");
+          }
+          [lon, lat] = geoData.features[0].geometry.coordinates;
+          latInput.value = lat.toFixed(6);
+          lonInput.value = lon.toFixed(6);
+        } else {
+          throw new Error("Please provide an address or Latitude/Longitude coordinates.");
         }
 
-        const [lon, lat] = geoData.features[0].geometry.coordinates;
-
-        // 2. Define style customizations
+        // Custom toner-grey styling layers
         const styleRules = "landcover_grass:%230a3c32|landcover_wood:%235b280e|water:%2362828c|waterway:%2362828c|rail:%2346505a;6|rail_hatch:%2346505a;10|road_path:%23a0cac1|water_name_lakeline:%23ffffff|water_name_way:%23ffffff|water_name_sea:%23ffffff|water_name_ocean:%23ffffff|road_label_primary:%2346505a|road_label_secondary:%2346505a|place_label_park:%2346505a|place_label_village:%2346505a|place_label_city:%2346505a|place_label_town:%2346505a|place_label_state:%2346505a|place_label_country:%2346505a|place_label_continent:%2346505a";
 
-        let mapUrl = `https://maps.geoapify.com/v1/staticmap?style=${baseStyle}&width=500&height=500&center=lonlat:${lon},${lat}&zoom=${zoom}&marker=lonlat:${lon},${lat};type:awesome;color:${markerColor};size:24&scaleFactor=2&apiKey=${API_KEY}`;
+        let mapUrl = `https://maps.geoapify.com/v1/staticmap?style=${baseStyle}&width=${width}&height=${height}&center=lonlat:${lon},${lat}&zoom=${zoom}&marker=lonlat:${lon},${lat};type:awesome;color:${markerColor};size:24&scaleFactor=${scale}&apiKey=${key}`;
 
         if (baseStyle === "toner-grey") {
           mapUrl += `&styleCustomization=${styleRules}`;
         }
 
-        // 3. Fetch image as blob
         const imgRes = await fetch(mapUrl);
         if (!imgRes.ok) {
-          throw new Error(`Server returned HTTP ${imgRes.status} while generating map.`);
+          throw new Error(`Geoapify returned HTTP ${imgRes.status}. Verify your API key and parameters.`);
         }
         
         const blob = await imgRes.blob();
         const objectUrl = URL.createObjectURL(blob);
 
-        // 4. Display preview in iframe
         img.src = objectUrl;
         img.style.display = "inline-block";
         hint.style.display = "block";
 
-        // 5. Trigger download to default downloads folder
-        const safeName = address.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 30);
+        const locationLabel = address || `${lat.toFixed(4)}_${lon.toFixed(4)}`;
+        const safeName = locationLabel.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 25);
         const filename = `map-${safeName}.png`;
+
         const a = document.createElement("a");
         a.href = objectUrl;
         a.download = filename;
